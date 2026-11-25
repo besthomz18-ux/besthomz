@@ -18,18 +18,23 @@ export function CategoryForm({ category }) {
 
   return (
     <form
-      className="max-w-xl space-y-4 rounded-2xl border border-bh-border bg-white p-6"
+      className="max-w-2xl space-y-5 rounded-3xl border border-white/75 bg-white/65 p-6 shadow-[0_18px_50px_rgba(27,61,47,0.08)] backdrop-blur-xl md:p-8"
       onSubmit={(e) => {
         e.preventDefault();
         setError("");
         const fd = new FormData(e.currentTarget);
         startTransition(async () => {
-          const res = await adminSaveCategory(fd);
-          if (!res.ok) setError(res.error);
-          else {
+          try {
+            const res = await adminSaveCategory(fd);
+            if (!res.ok) {
+              setError(res.error || "Could not save this category.");
+              return;
+            }
             toast("Category saved");
             router.push("/admin/categories");
             router.refresh();
+          } catch {
+            setError("Could not save this category. Check your connection and try again.");
           }
         });
       }}
@@ -41,8 +46,8 @@ export function CategoryForm({ category }) {
       <FormField label="Image URL" htmlFor="image_url"><Input id="image_url" name="image_url" defaultValue={category?.image_url || ""} /></FormField>
       <FormField label="Sort order" htmlFor="sort_order"><Input id="sort_order" name="sort_order" type="number" defaultValue={category?.sort_order ?? 0} /></FormField>
       <Checkbox id="is_active" name="is_active" label="Active" defaultChecked={category?.is_active ?? true} />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button type="submit" loading={pending}>Save</Button>
+      {error && <p className="rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+      <Button type="submit" loading={pending}>{pending ? "Saving…" : "Save category"}</Button>
     </form>
   );
 }

@@ -76,8 +76,10 @@ export function AdminSidebar() {
 
   return (
     <>
-      <aside className="hidden w-64 shrink-0 border-r border-bh-border bg-white/80 p-4 backdrop-blur md:block">
-        <p className="mb-6 font-display text-lg font-semibold text-bh-green">Best Homz Admin</p>
+      <aside className="hidden w-64 shrink-0 border-r border-white/60 bg-white/45 p-4 backdrop-blur-2xl md:block">
+        <p className="mb-6 rounded-2xl border border-white/75 bg-white/65 px-4 py-3 font-display text-lg font-semibold text-bh-green shadow-sm">
+          Best Homz <span className="block font-sans text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-bh-muted">Admin studio</span>
+        </p>
         <NavLinks />
       </aside>
       <button
@@ -91,7 +93,7 @@ export function AdminSidebar() {
       {open && (
         <div className="fixed inset-0 z-[60] md:hidden">
           <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-[min(100%,18rem)] bg-white p-4 shadow-xl">
+          <div className="absolute inset-y-0 left-0 w-[min(100%,18rem)] border-r border-white/70 bg-bh-cream/90 p-4 shadow-2xl backdrop-blur-2xl">
             <div className="mb-4 flex items-center justify-between">
               <span className="font-display font-semibold">Menu</span>
               <button type="button" onClick={() => setOpen(false)} className="rounded-full p-2 bh-focus-ring" aria-label="Close menu">

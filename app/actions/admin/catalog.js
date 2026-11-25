@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { getStaffSupabase } from "@/lib/auth/staff";
 import { validateSlug, trimField, FORM_LIMITS } from "@/lib/validation/forms";
 
-async function uniqueSlug(supabase, table, slug, excludeId) {
+async function uniqueSlug(supabase, table, slug, excludeId, scope = {}) {
   let q = supabase.from(table).select("id").eq("slug", slug);
   if (excludeId) q = q.neq("id", excludeId);
-  const { data } = await q.maybeSingle();
-  return !data?.id;
+  for (const [field, value] of Object.entries(scope)) q = q.eq(field, value);
+  const { data, error } = await q.maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, isUnique: !data?.id };
 }
 
 export async function adminSaveCategory(formData) {
@@ -17,7 +19,9 @@ export async function adminSaveCategory(formData) {
   const id = formData.get("id")?.toString();
   const slugCheck = validateSlug(formData.get("slug"));
   if (!slugCheck.ok) return { ok: false, error: slugCheck.error };
-  if (!(await uniqueSlug(supabase, "categories", slugCheck.slug, id))) {
+  const slugResult = await uniqueSlug(supabase, "categories", slugCheck.slug, id);
+  if (!slugResult.ok) return { ok: false, error: slugResult.error };
+  if (!slugResult.isUnique) {
     return { ok: false, error: "Slug already in use." };
   }
   const payload = {
@@ -26,13 +30,31 @@ export async function adminSaveCategory(formData) {
     description: trimField(formData.get("description"), FORM_LIMITS.message),
     image_url: trimField(formData.get("image_url"), 500),
     sort_order: Number(formData.get("sort_order") || 0),
-    is_active: formData.get("is_active") !== "off",
+    is_active: formData.has("is_active"),
   };
   if (!payload.name) return { ok: false, error: "Name required." };
-  const q = id ? supabase.from("categories").update(payload).eq("id", id) : supabase.from("categories").insert(payload);
+  const q = id
+    ? supabase.from("categories").update(payload).eq("id", id)
+    : supabase.from("categories").insert(payload);
   const { error } = await q;
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/categories");
+  revalidatePath("/admin/subcategories");
+  revalidatePath("/admin/products");
+  revalidatePath("/furniture");
+  return { ok: true };
+}
+
+export async function adminDeleteCategory(categoryId) {
+  const { supabase } = await getStaffSupabase();
+  if (!supabase) return { ok: false, error: "Unauthorized" };
+  if (!categoryId) return { ok: false, error: "Category is required." };
+  const { error } = await supabase.from("categories").delete().eq("id", categoryId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/subcategories");
+  revalidatePath("/admin/products");
+  revalidatePath("/furniture");
   return { ok: true };
 }
 
@@ -44,19 +66,38 @@ export async function adminSaveSubcategory(formData) {
   if (!category_id) return { ok: false, error: "Category is required." };
   const slugCheck = validateSlug(formData.get("slug"));
   if (!slugCheck.ok) return { ok: false, error: slugCheck.error };
+  const slugResult = await uniqueSlug(supabase, "subcategories", slugCheck.slug, id, { category_id });
+  if (!slugResult.ok) return { ok: false, error: slugResult.error };
+  if (!slugResult.isUnique) return { ok: false, error: "Slug already in use for this category." };
   const payload = {
     category_id,
     name: trimField(formData.get("name"), FORM_LIMITS.name),
     slug: slugCheck.slug,
     description: trimField(formData.get("description"), FORM_LIMITS.shortText),
     sort_order: Number(formData.get("sort_order") || 0),
-    is_active: formData.get("is_active") !== "off",
+    is_active: formData.has("is_active"),
   };
   if (!payload.name) return { ok: false, error: "Name required." };
-  const q = id ? supabase.from("subcategories").update(payload).eq("id", id) : supabase.from("subcategories").insert(payload);
+  const q = id
+    ? supabase.from("subcategories").update(payload).eq("id", id)
+    : supabase.from("subcategories").insert(payload);
   const { error } = await q;
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/subcategories");
+  revalidatePath("/admin/products");
+  revalidatePath("/furniture");
+  return { ok: true };
+}
+
+export async function adminDeleteSubcategory(subcategoryId) {
+  const { supabase } = await getStaffSupabase();
+  if (!supabase) return { ok: false, error: "Unauthorized" };
+  if (!subcategoryId) return { ok: false, error: "Subcategory is required." };
+  const { error } = await supabase.from("subcategories").delete().eq("id", subcategoryId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/subcategories");
+  revalidatePath("/admin/products");
+  revalidatePath("/furniture");
   return { ok: true };
 }
 
@@ -66,7 +107,9 @@ export async function adminSaveRoom(formData) {
   const id = formData.get("id")?.toString();
   const slugCheck = validateSlug(formData.get("slug"));
   if (!slugCheck.ok) return { ok: false, error: slugCheck.error };
-  if (!(await uniqueSlug(supabase, "rooms", slugCheck.slug, id))) {
+  const slugResult = await uniqueSlug(supabase, "rooms", slugCheck.slug, id);
+  if (!slugResult.ok) return { ok: false, error: slugResult.error };
+  if (!slugResult.isUnique) {
     return { ok: false, error: "Slug already in use." };
   }
   const payload = {
@@ -75,7 +118,7 @@ export async function adminSaveRoom(formData) {
     description: trimField(formData.get("description"), FORM_LIMITS.message),
     hero_image: trimField(formData.get("hero_image"), 500),
     sort_order: Number(formData.get("sort_order") || 0),
-    is_active: formData.get("is_active") !== "off",
+    is_active: formData.has("is_active"),
   };
   if (!payload.name) return { ok: false, error: "Name required." };
   const q = id ? supabase.from("rooms").update(payload).eq("id", id) : supabase.from("rooms").insert(payload);
@@ -91,7 +134,9 @@ export async function adminSaveCollection(formData) {
   const id = formData.get("id")?.toString();
   const slugCheck = validateSlug(formData.get("slug"));
   if (!slugCheck.ok) return { ok: false, error: slugCheck.error };
-  if (!(await uniqueSlug(supabase, "collections", slugCheck.slug, id))) {
+  const slugResult = await uniqueSlug(supabase, "collections", slugCheck.slug, id);
+  if (!slugResult.ok) return { ok: false, error: slugResult.error };
+  if (!slugResult.isUnique) {
     return { ok: false, error: "Slug already in use." };
   }
   const payload = {
@@ -101,7 +146,7 @@ export async function adminSaveCollection(formData) {
     hero_image: trimField(formData.get("hero_image"), 500),
     sort_order: Number(formData.get("sort_order") || 0),
     is_featured: formData.get("is_featured") === "on",
-    is_active: formData.get("is_active") !== "off",
+    is_active: formData.has("is_active"),
   };
   if (!payload.name) return { ok: false, error: "Name required." };
   if (id) {
@@ -122,7 +167,9 @@ export async function adminSaveOffer(formData) {
   const id = formData.get("id")?.toString();
   const slugCheck = validateSlug(formData.get("slug"));
   if (!slugCheck.ok) return { ok: false, error: slugCheck.error };
-  if (!(await uniqueSlug(supabase, "offers", slugCheck.slug, id))) {
+  const slugResult = await uniqueSlug(supabase, "offers", slugCheck.slug, id);
+  if (!slugResult.ok) return { ok: false, error: slugResult.error };
+  if (!slugResult.isUnique) {
     return { ok: false, error: "Slug already in use." };
   }
   const payload = {
@@ -134,7 +181,7 @@ export async function adminSaveOffer(formData) {
     cta_url: trimField(formData.get("cta_url"), 500),
     starts_at: formData.get("starts_at")?.toString() || null,
     ends_at: formData.get("ends_at")?.toString() || null,
-    is_active: formData.get("is_active") !== "off",
+    is_active: formData.has("is_active"),
   };
   if (!payload.title) return { ok: false, error: "Title required." };
   const q = id ? supabase.from("offers").update(payload).eq("id", id) : supabase.from("offers").insert(payload);
@@ -153,7 +200,7 @@ export async function adminSaveFaq(formData) {
     answer: trimField(formData.get("answer"), FORM_LIMITS.message),
     category: trimField(formData.get("category"), 80),
     sort_order: Number(formData.get("sort_order") || 0),
-    is_active: formData.get("is_active") !== "off",
+    is_active: formData.has("is_active"),
   };
   if (!payload.question || !payload.answer) return { ok: false, error: "Question and answer required." };
   const q = id ? supabase.from("faqs").update(payload).eq("id", id) : supabase.from("faqs").insert(payload);

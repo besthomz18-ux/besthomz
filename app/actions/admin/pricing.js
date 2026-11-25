@@ -19,12 +19,13 @@ export async function adminSaveProductPricing(formData) {
   const is_active = formData.get("is_active") === "on";
   const currency = formData.get("currency")?.toString() || "INR";
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("product_pricing")
     .select("id")
     .eq("product_id", productId)
     .is("variant_id", null)
     .maybeSingle();
+  if (existingError) return { ok: false, error: existingError.message };
 
   const payload = { product_id: productId, variant_id: null, price, currency, is_active };
 

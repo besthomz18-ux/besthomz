@@ -5,8 +5,12 @@ import { getStaffSupabase } from "@/lib/auth/staff";
 
 export async function adminUpdateReviewStatus(id, status) {
   const { supabase } = await getStaffSupabase();
-  if (!supabase) return { ok: false };
-  await supabase.from("reviews").update({ status }).eq("id", id);
+  if (!supabase) return { ok: false, error: "Unauthorized" };
+  if (!["pending", "approved", "rejected"].includes(status)) {
+    return { ok: false, error: "Invalid review status." };
+  }
+  const { error } = await supabase.from("reviews").update({ status }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/reviews");
   return { ok: true };
 }

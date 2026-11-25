@@ -18,18 +18,23 @@ export function FaqForm({ faq }) {
 
   return (
     <form
-      className="max-w-xl space-y-4 rounded-2xl border border-bh-border bg-white p-6"
+      className="max-w-2xl space-y-5 rounded-3xl border border-white/75 bg-white/65 p-6 shadow-[0_18px_50px_rgba(27,61,47,0.08)] backdrop-blur-xl md:p-8"
       onSubmit={(e) => {
         e.preventDefault();
         setError("");
         const fd = new FormData(e.currentTarget);
         startTransition(async () => {
-          const res = await adminSaveFaq(fd);
-          if (!res.ok) setError(res.error);
-          else {
+          try {
+            const res = await adminSaveFaq(fd);
+            if (!res.ok) {
+              setError(res.error || "Could not save this FAQ.");
+              return;
+            }
             toast("FAQ saved");
             router.push("/admin/faqs");
             router.refresh();
+          } catch {
+            setError("Could not save this FAQ. Check your connection and try again.");
           }
         });
       }}
@@ -40,8 +45,8 @@ export function FaqForm({ faq }) {
       <FormField label="Category" htmlFor="category"><Input id="category" name="category" defaultValue={faq?.category || ""} /></FormField>
       <FormField label="Sort order" htmlFor="sort_order"><Input id="sort_order" name="sort_order" type="number" defaultValue={faq?.sort_order ?? 0} /></FormField>
       <Checkbox id="is_active" name="is_active" label="Active" defaultChecked={faq?.is_active ?? true} />
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-      <Button type="submit" loading={pending}>Save</Button>
+      {error && <p className="rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+      <Button type="submit" loading={pending}>{pending ? "Saving…" : "Save FAQ"}</Button>
     </form>
   );
 }

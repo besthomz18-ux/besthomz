@@ -28,10 +28,11 @@ export async function adminUploadProductImage(productId, formData) {
   const { data: pub } = supabase.storage.from("products").getPublicUrl(path);
   const image_url = pub.publicUrl;
 
-  const { count } = await supabase
+  const { count, error: countError } = await supabase
     .from("product_images")
     .select("id", { count: "exact", head: true })
     .eq("product_id", productId);
+  if (countError) return { ok: false, error: countError.message };
 
   const isPrimary = (count ?? 0) === 0;
 
@@ -52,7 +53,11 @@ export async function adminUploadProductImage(productId, formData) {
 export async function adminDeleteProductImage(imageId, productId) {
   const { supabase } = await getStaffSupabase();
   if (!supabase) return { ok: false, error: "Unauthorized" };
-  const { error } = await supabase.from("product_images").delete().eq("id", imageId);
+  const { error } = await supabase
+    .from("product_images")
+    .delete()
+    .eq("id", imageId)
+    .eq("product_id", productId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/admin/products/${productId}/edit`);
   return { ok: true };
@@ -61,11 +66,16 @@ export async function adminDeleteProductImage(imageId, productId) {
 export async function adminSetPrimaryImage(imageId, productId) {
   const { supabase } = await getStaffSupabase();
   if (!supabase) return { ok: false, error: "Unauthorized" };
-  await supabase.from("product_images").update({ is_primary: false }).eq("product_id", productId);
+  const { error: clearError } = await supabase
+    .from("product_images")
+    .update({ is_primary: false })
+    .eq("product_id", productId);
+  if (clearError) return { ok: false, error: clearError.message };
   const { error } = await supabase
     .from("product_images")
     .update({ is_primary: true, image_type: "primary" })
-    .eq("id", imageId);
+    .eq("id", imageId)
+    .eq("product_id", productId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/admin/products/${productId}/edit`);
   return { ok: true };
@@ -76,7 +86,12 @@ export async function adminReorderProductImages(productId, orderedIds) {
   if (!supabase) return { ok: false, error: "Unauthorized" };
   if (!Array.isArray(orderedIds)) return { ok: false, error: "Invalid order." };
   for (let i = 0; i < orderedIds.length; i++) {
-    await supabase.from("product_images").update({ sort_order: i }).eq("id", orderedIds[i]).eq("product_id", productId);
+    const { error } = await supabase
+      .from("product_images")
+      .update({ sort_order: i })
+      .eq("id", orderedIds[i])
+      .eq("product_id", productId);
+    if (error) return { ok: false, error: error.message };
   }
   revalidatePath(`/admin/products/${productId}/edit`);
   return { ok: true };

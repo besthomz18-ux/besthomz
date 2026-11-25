@@ -27,7 +27,8 @@ export function LoginForm({ next = "/account", showSignup = true }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form action={signInWithPassword} onSubmit={onSubmit} className="space-y-5">
+      <input type="hidden" name="next" value={next} />
       <FormField label="Email" htmlFor="email" required>
         <div className="relative">
           <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-bh-muted" aria-hidden />

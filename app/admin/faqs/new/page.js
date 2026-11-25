@@ -1,9 +1,10 @@
 import { FaqForm } from "@/components/admin/FaqForm";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default function AdminNewFaqPage() {
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl font-semibold">New FAQ</h1>
+      <AdminPageHeader title="New FAQ" description="Add a helpful answer to common customer questions." />
       <FaqForm />
     </div>
   );
