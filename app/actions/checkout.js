@@ -62,6 +62,7 @@ export async function getCartPriceSummary(localItems = []) {
       .in("slug", [...localItemsBySlug.keys()])
       .eq("status", "active");
     if (error) {
+      console.error("[cart] Could not load guest cart products for pricing", { code: error.code });
       return { ok: false, error: "Could not load online prices for your cart." };
     }
 
@@ -86,7 +87,7 @@ export async function getCartPriceSummary(localItems = []) {
     }
   }
 
-  return calculateCartPricing(admin, cartItems);
+  return calculateCartPricing(admin, cartItems, { allowCatalogEstimates: true });
 }
 
 export async function getCheckoutPreview() {

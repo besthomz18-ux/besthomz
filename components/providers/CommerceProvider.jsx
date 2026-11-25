@@ -1,11 +1,20 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { addToCart as addToCartAction } from "@/app/actions/cart";
 import { addToWishlist as addToWishlistAction, removeFromWishlist } from "@/app/actions/wishlist";
 import {
   addGuestCartItem,
   getGuestCartCount,
+  getGuestCartSnapshot,
   getGuestWishlistSlugs,
   subscribeGuestCart,
   toggleGuestWishlistSlug,
@@ -14,11 +23,59 @@ import { useToast } from "@/components/providers/ToastProvider";
 
 const CommerceContext = createContext(null);
 
-export function CommerceProvider({ children, initialCartCount = 0, initialWishlistCount = 0 }) {
+export function CommerceProvider({
+  children,
+  initialCartCount = 0,
+  initialCartProductKeys = [],
+  initialWishlistCount = 0,
+}) {
   const { toast } = useToast();
   const [serverCartCount, setServerCartCount] = useState(initialCartCount);
-  const guestCartCount = useSyncExternalStore(subscribeGuestCart, getGuestCartCount, () => 0);
+  const guestCartSnapshot = useSyncExternalStore(subscribeGuestCart, getGuestCartSnapshot, () => "[]");
+  const guestCartItems = useMemo(() => {
+    try {
+      const items = JSON.parse(guestCartSnapshot);
+      return Array.isArray(items)
+        ? items.filter(
+            (item) =>
+              typeof item?.slug === "string" &&
+              Number.isInteger(item.quantity) &&
+              item.quantity > 0,
+          )
+        : [];
+    } catch {
+      return [];
+    }
+  }, [guestCartSnapshot]);
+  const guestCartCount = guestCartItems.reduce((count, item) => count + item.quantity, 0);
   const cartCount = serverCartCount + guestCartCount;
+  const [lastInitialCartProductKeys, setLastInitialCartProductKeys] = useState(initialCartProductKeys);
+  const [serverCartProductKeys, setServerCartProductKeys] = useState(initialCartProductKeys);
+  const pendingCartAdds = useRef(new Map());
+  if (lastInitialCartProductKeys !== initialCartProductKeys) {
+    setLastInitialCartProductKeys(initialCartProductKeys);
+    setServerCartProductKeys(initialCartProductKeys);
+  }
+  const cartProductKeys = useMemo(() => {
+    const keys = new Set(serverCartProductKeys);
+    for (const item of guestCartItems) {
+      keys.add(item.slug);
+      keys.add(`import-${item.slug}`);
+    }
+    return keys;
+  }, [guestCartItems, serverCartProductKeys]);
+  const isProductInCart = useCallback(
+    (productId, slug) => cartProductKeys.has(productId) || Boolean(slug && cartProductKeys.has(slug)),
+    [cartProductKeys],
+  );
+  const setCartProductKeys = useCallback((keys) => {
+    setServerCartProductKeys([...new Set((keys || []).filter((key) => typeof key === "string" && key))]);
+  }, []);
+  const markCartProductsAdded = useCallback((keys) => {
+    const validKeys = (keys || []).filter((key) => typeof key === "string" && key);
+    if (!validKeys.length) return;
+    setServerCartProductKeys((current) => [...new Set([...current, ...validKeys])]);
+  }, []);
   const setCartCount = useCallback(
     (totalCount) => setServerCartCount(Math.max(0, totalCount - getGuestCartCount())),
     [],
@@ -28,31 +85,50 @@ export function CommerceProvider({ children, initialCartCount = 0, initialWishli
   );
 
   const addToCart = useCallback(
-    async ({ productId, quantity = 1 }) => {
+    async ({ productId, slug, quantity = 1 }) => {
       const requestedQuantity = Math.min(
         99,
         Math.max(1, Math.floor(Number(quantity) || 1)),
       );
+      if (isProductInCart(productId, slug)) {
+        return { ok: true, alreadyInCart: true };
+      }
+
+      const pendingKey = slug || productId;
+      if (pendingCartAdds.current.has(pendingKey)) {
+        return pendingCartAdds.current.get(pendingKey);
+      }
+
       const importedProductSlug =
         typeof productId === "string" && productId.startsWith("import-")
           ? productId.slice("import-".length)
           : "";
-      if (/^[a-z0-9][a-z0-9-]*$/.test(importedProductSlug)) {
-        addGuestCartItem(importedProductSlug, requestedQuantity);
-        toast(`Added ${requestedQuantity} to cart`);
-        return { ok: true, guest: true };
-      }
 
-      const result = await addToCartAction({ productId, quantity: requestedQuantity });
-      if (!result.ok) {
-        toast(result.error || "Could not add to cart", { variant: "error" });
+      const addPromise = (async () => {
+        if (/^[a-z0-9][a-z0-9-]*$/.test(importedProductSlug)) {
+          addGuestCartItem(importedProductSlug, requestedQuantity);
+          toast(`Added ${requestedQuantity} to cart`);
+          return { ok: true, guest: true };
+        }
+
+        const result = await addToCartAction({ productId, quantity: requestedQuantity });
+        if (!result.ok) {
+          toast(result.error || "Could not add to cart", { variant: "error" });
+          return result;
+        }
+        setServerCartCount((count) => count + requestedQuantity);
+        markCartProductsAdded([productId, slug]);
+        toast(`Added ${requestedQuantity} to cart`);
         return result;
+      })();
+      pendingCartAdds.current.set(pendingKey, addPromise);
+      try {
+        return await addPromise;
+      } finally {
+        pendingCartAdds.current.delete(pendingKey);
       }
-      setServerCartCount((count) => count + requestedQuantity);
-      toast(`Added ${requestedQuantity} to cart`);
-      return result;
     },
-    [toast],
+    [isProductInCart, markCartProductsAdded, toast],
   );
 
   const toggleWishlist = useCallback(
@@ -92,8 +168,27 @@ export function CommerceProvider({ children, initialCartCount = 0, initialWishli
   );
 
   const value = useMemo(
-    () => ({ cartCount, wishlistCount, setCartCount, setWishlistCount, addToCart, toggleWishlist }),
-    [cartCount, wishlistCount, setCartCount, addToCart, toggleWishlist],
+    () => ({
+      cartCount,
+      wishlistCount,
+      setCartCount,
+      setCartProductKeys,
+      markCartProductsAdded,
+      isProductInCart,
+      setWishlistCount,
+      addToCart,
+      toggleWishlist,
+    }),
+    [
+      cartCount,
+      wishlistCount,
+      setCartCount,
+      setCartProductKeys,
+      markCartProductsAdded,
+      isProductInCart,
+      addToCart,
+      toggleWishlist,
+    ],
   );
 
   return <CommerceContext.Provider value={value}>{children}</CommerceContext.Provider>;

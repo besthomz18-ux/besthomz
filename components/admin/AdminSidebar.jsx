@@ -56,12 +56,15 @@ function NavLinks({ onNavigate }) {
             <Link
               href={item.href}
               onClick={onNavigate}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium bh-focus-ring",
-                active ? "bg-bh-green text-white" : "text-bh-charcoal hover:bg-white/70",
+                "group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium transition duration-200 bh-focus-ring",
+                active
+                  ? "border-white/20 bg-bh-green text-white shadow-[0_8px_20px_rgba(27,61,47,0.2)]"
+                  : "border-transparent text-bh-charcoal hover:border-white/70 hover:bg-white/60 hover:shadow-sm",
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon className={cn("h-4 w-4 shrink-0 transition", active ? "text-white" : "text-bh-green/70 group-hover:text-bh-green")} />
               {item.label}
             </Link>
           </li>
@@ -76,15 +79,15 @@ export function AdminSidebar() {
 
   return (
     <>
-      <aside className="hidden w-64 shrink-0 border-r border-white/60 bg-white/45 p-4 backdrop-blur-2xl md:block">
-        <p className="mb-6 rounded-2xl border border-white/75 bg-white/65 px-4 py-3 font-display text-lg font-semibold text-bh-green shadow-sm">
-          Best Homz <span className="block font-sans text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-bh-muted">Admin studio</span>
+      <aside className="hidden w-64 shrink-0 border-r border-white/65 bg-white/38 p-4 shadow-[8px_0_32px_rgba(27,61,47,0.035)] backdrop-blur-2xl md:block">
+        <p className="mb-6 rounded-2xl border border-white/80 bg-white/65 px-4 py-3 font-display text-lg font-semibold text-bh-green shadow-[0_10px_28px_rgba(27,61,47,0.08)]">
+          Best Homz <span className="mt-1 block font-sans text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-bh-muted">Admin studio</span>
         </p>
         <NavLinks />
       </aside>
       <button
         type="button"
-        className="fixed bottom-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-bh-green text-white shadow-lg md:hidden bh-focus-ring"
+        className="fixed bottom-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-bh-green text-white shadow-[0_12px_30px_rgba(27,61,47,0.3)] md:hidden bh-focus-ring"
         aria-label="Open admin menu"
         onClick={() => setOpen(true)}
       >
@@ -93,7 +96,7 @@ export function AdminSidebar() {
       {open && (
         <div className="fixed inset-0 z-[60] md:hidden">
           <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-[min(100%,18rem)] border-r border-white/70 bg-bh-cream/90 p-4 shadow-2xl backdrop-blur-2xl">
+          <div className="absolute inset-y-0 left-0 w-[min(100%,18rem)] border-r border-white/70 bg-white/82 p-4 shadow-2xl backdrop-blur-2xl">
             <div className="mb-4 flex items-center justify-between">
               <span className="font-display font-semibold">Menu</span>
               <button type="button" onClick={() => setOpen(false)} className="rounded-full p-2 bh-focus-ring" aria-label="Close menu">

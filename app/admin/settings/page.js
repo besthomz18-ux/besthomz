@@ -12,9 +12,9 @@ export default async function AdminSettingsPage() {
       </p>
       <ul className="space-y-3">
         {rows.map((row) => (
-          <li key={row.key} className="rounded-xl border border-bh-border bg-white p-4 text-sm">
-            <p className="font-medium">{row.key}</p>
-            <pre className="mt-2 overflow-x-auto rounded bg-bh-cream/60 p-2 text-xs">{JSON.stringify(row.value, null, 2)}</pre>
+          <li key={row.key} className="bh-admin-surface rounded-2xl p-4 text-sm">
+            <p className="font-semibold text-bh-green">{row.key}</p>
+            <pre className="mt-3 overflow-x-auto rounded-xl border border-white/70 bg-white/45 p-3 text-xs">{JSON.stringify(row.value, null, 2)}</pre>
             {row.description && <p className="mt-1 text-bh-muted">{row.description}</p>}
           </li>
         ))}

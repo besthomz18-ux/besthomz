@@ -44,15 +44,29 @@ async function getGuestAdmin() {
 
 async function ensureUserCart(supabase, userId) {
   const existing = await getActiveCartForUser(supabase, userId);
+  if (existing.error) {
+    console.error("[cart] Could not load active customer cart", { code: existing.error.code });
+    return null;
+  }
   if (existing.data?.id) return existing.data.id;
   const created = await createUserCart(supabase, userId);
+  if (created.error) {
+    console.error("[cart] Could not create customer cart", { code: created.error.code });
+  }
   return created.data?.id;
 }
 
 async function ensureSessionCart(admin, sessionId) {
   const existing = await getActiveCartForSession(admin, sessionId);
+  if (existing.error) {
+    console.error("[cart] Could not load active guest cart", { code: existing.error.code });
+    return null;
+  }
   if (existing.data?.id) return existing.data.id;
   const created = await createSessionCart(admin, sessionId);
+  if (created.error) {
+    console.error("[cart] Could not create guest cart", { code: created.error.code });
+  }
   return created.data?.id;
 }
 
@@ -222,16 +236,29 @@ export async function mergeGuestCartOnLogin() {
   }
 
   const userCartId = await ensureUserCart(supabase, user.id);
+  if (!userCartId) return { ok: false, error: "Could not create cart." };
+
   for (const line of guestCart.data.cart_items) {
-    await upsertCartLine(supabase, userCartId, {
+    const { error } = await upsertCartLine(supabase, userCartId, {
       productId: line.product_id,
       variantId: line.variant_id,
       quantity: line.quantity,
       customizationData: line.customization_data || {},
     });
+    if (error) {
+      console.error("[cart] Could not merge guest cart item", { code: error.code });
+      return { ok: false, error: "Could not merge cart." };
+    }
   }
 
-  await admin.from("carts").update({ status: "abandoned" }).eq("id", guestCart.data.id);
+  const { error: archiveError } = await admin
+    .from("carts")
+    .update({ status: "abandoned" })
+    .eq("id", guestCart.data.id);
+  if (archiveError) {
+    console.error("[cart] Could not archive merged guest cart", { code: archiveError.code });
+    return { ok: false, error: "Could not merge cart." };
+  }
   await clearCartSessionCookie();
   revalidatePath("/cart");
   return { ok: true };

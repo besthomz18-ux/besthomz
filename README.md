@@ -26,8 +26,10 @@ Copy `.env.example` to `.env.local` and replace the example values. SMTP
 notifications use `EMAIL_PROVIDER=smtp`, the `SMTP_*` settings, and
 `ADMIN_NOTIFICATION_EMAIL`. Paid order confirmations go to the customer and
 admin; contact enquiries go to the admin and receive an acknowledgement when
-the customer supplied an email address. Shipping status updates notify the
-customer.
+the customer supplied an email address; quote requests notify the admin and
+send a receipt to the customer when an email address is provided. Gmail app
+password whitespace is removed automatically when loading SMTP credentials.
+Shipping status updates notify the customer.
 
 Set `NEXT_PUBLIC_SHOW_PRICES=true` and `NEXT_PUBLIC_CHECKOUT_ENABLED=true` to
 show the cart price breakdown and enable checkout. Each purchasable product

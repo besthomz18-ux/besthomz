@@ -25,6 +25,7 @@
 - `config/pricing.js` — `SHOW_PRICES` reads `NEXT_PUBLIC_SHOW_PRICES` (default `false`).
 - `CHECKOUT_ENABLED` = `NEXT_PUBLIC_CHECKOUT_ENABLED=true` OR `SHOW_PRICES`.
 - Cart totals are calculated server-side from active `product_pricing` rows; product catalog display prices are not used for checkout.
+- When a product has no active checkout price, the cart may show its imported listed price as an estimate; it is labeled and cannot be used to start online checkout. Checkout always requires an active `product_pricing` row.
 - Customer catalog never reads `product_pricing` directly; RLS remains staff-only.
 
 ## Checkout flow

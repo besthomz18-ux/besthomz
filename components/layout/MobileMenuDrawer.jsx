@@ -6,6 +6,7 @@ import { ChevronDown, X } from "lucide-react";
 import { mainNav } from "@/config/site";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useQuote } from "@/components/providers/QuoteProvider";
 import { cn } from "@/lib/cn";
 
@@ -148,13 +149,20 @@ export function MobileMenuDrawer({ open, onClose, navMenus = {}, user = null }) 
         </nav>
         <div className="space-y-3 border-t border-black/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {user ? (
-            <Link
-              href="/account"
-              onClick={onClose}
-              className="inline-flex h-10 w-full items-center justify-center rounded-full border border-bh-green/20 text-sm font-semibold text-bh-green bh-focus-ring"
-            >
-              My account · {user.name}
-            </Link>
+            <>
+              <Link
+                href="/account"
+                onClick={onClose}
+                className="inline-flex h-10 w-full items-center justify-center rounded-full border border-bh-green/20 bg-white/65 text-sm font-semibold text-bh-green shadow-sm bh-focus-ring"
+              >
+                My account · {user.name}
+              </Link>
+              <SignOutButton
+                redirectTo="/login"
+                className="w-full border-red-200/70 bg-white/70 text-red-700 hover:border-red-300 hover:bg-red-50"
+                onSubmit={onClose}
+              />
+            </>
           ) : (
             <div className="grid grid-cols-2 gap-2">
               <Link

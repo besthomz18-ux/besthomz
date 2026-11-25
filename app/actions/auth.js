@@ -216,10 +216,18 @@ export async function signUp(formData) {
   redirect(next);
 }
 
-export async function signOut() {
+export async function signOut(formData) {
+  const redirectTo = getSafeNextPath(formData?.get("redirect_to")?.toString(), "/login");
   const supabase = await createClientOptional();
-  if (supabase) await supabase.auth.signOut();
-  redirect("/");
+  if (!supabase) {
+    redirect(`${redirectTo}${redirectTo.includes("?") ? "&" : "?"}error=signout_failed`);
+  }
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error("[auth] Could not sign out", { code: error.code });
+    redirect(`${redirectTo}${redirectTo.includes("?") ? "&" : "?"}error=signout_failed`);
+  }
+  redirect(redirectTo);
 }
 
 export async function requestPasswordReset(formData) {

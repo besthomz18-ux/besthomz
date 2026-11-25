@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useTransition } from "react";
 import { ArrowRight, Heart, ShoppingBag } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -44,8 +45,10 @@ export function ProductCard({
   const numericPrice = Number(price);
   const hasPrice = Number.isFinite(numericPrice) && numericPrice > 0;
   const { openQuote } = useQuote();
-  const { addToCart, toggleWishlist } = useCommerce();
+  const { addToCart, isProductInCart, toggleWishlist } = useCommerce();
   const slug = href?.replace("/product/", "") || "";
+  const isInCart = isProductInCart(id, slug);
+  const [addingToCart, startAddingToCart] = useTransition();
   const saved = slug && getGuestWishlistSlugs().includes(slug);
 
   const handleWishlist = (e) => {
@@ -55,9 +58,14 @@ export function ProductCard({
 
   const handleCart = (e) => {
     e.preventDefault();
-    if (onAddToCart) onAddToCart();
-    else addToCart({ productId: id });
+    if (isInCart || addingToCart) return;
+    startAddingToCart(async () => {
+      if (onAddToCart) await onAddToCart();
+      else await addToCart({ productId: id, slug });
+    });
   };
+
+  const cartButtonLabel = addingToCart ? "Adding..." : "Add to Cart";
 
   return (
     <article
@@ -198,14 +206,25 @@ export function ProductCard({
                 Get Quote
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden />
               </button>
-              <button
-                type="button"
-                onClick={handleCart}
-                className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-1.5 rounded-full bg-bh-green px-3 py-2 text-[0.8125rem] font-semibold text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring sm:text-xs"
-              >
-                <ShoppingBag className="h-3.5 w-3.5" aria-hidden />
-                Add to Cart
-              </button>
+              {isInCart ? (
+                <Link
+                  href="/cart"
+                  className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-1.5 rounded-full bg-bh-green px-3 py-2 text-[0.8125rem] font-semibold text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring sm:text-xs"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5" aria-hidden />
+                  Go to Cart
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled={addingToCart}
+                  onClick={handleCart}
+                  className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-1.5 rounded-full bg-bh-green px-3 py-2 text-[0.8125rem] font-semibold text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring disabled:cursor-not-allowed disabled:opacity-70 sm:text-xs"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5" aria-hidden />
+                  {cartButtonLabel}
+                </button>
+              )}
             </div>
           ) : isCategory ? (
             <div className="flex flex-col gap-2 lg:flex-row">
@@ -215,14 +234,25 @@ export function ProductCard({
               >
                 View Details
               </Link>
-              <button
-                type="button"
-                onClick={handleCart}
-                className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-full bg-bh-green px-2.5 py-2 text-[0.8125rem] font-semibold leading-tight text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring sm:px-3 sm:text-xs lg:min-h-0"
-              >
-                <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span className="truncate">Add to Cart</span>
-              </button>
+              {isInCart ? (
+                <Link
+                  href="/cart"
+                  className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-full bg-bh-green px-2.5 py-2 text-[0.8125rem] font-semibold leading-tight text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring sm:px-3 sm:text-xs lg:min-h-0"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">Go to Cart</span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled={addingToCart}
+                  onClick={handleCart}
+                  className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-full bg-bh-green px-2.5 py-2 text-[0.8125rem] font-semibold leading-tight text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring disabled:cursor-not-allowed disabled:opacity-70 sm:px-3 sm:text-xs lg:min-h-0"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">{cartButtonLabel}</span>
+                </button>
+              )}
             </div>
           ) : isCollection ? (
             <Link
@@ -246,14 +276,25 @@ export function ProductCard({
                 Get Quote
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden />
               </button>
-              <button
-                type="button"
-                onClick={handleCart}
-                className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-full bg-bh-green px-3.5 py-2 text-xs font-semibold text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring"
-              >
-                <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span>Add to Cart</span>
-              </button>
+              {isInCart ? (
+                <Link
+                  href="/cart"
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-full bg-bh-green px-3.5 py-2 text-xs font-semibold text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span>Go to Cart</span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled={addingToCart}
+                  onClick={handleCart}
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-full bg-bh-green px-3.5 py-2 text-xs font-semibold text-white shadow-[0_6px_16px_rgba(27,61,47,0.2)] bh-focus-ring disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span>{cartButtonLabel}</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -271,15 +312,28 @@ export function ProductCard({
               >
                 Get Quote
               </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                className="flex-1"
-                onClick={handleCart}
-                icon={<ShoppingBag className="h-3.5 w-3.5" />}
-              >
-                Add to Cart
-              </Button>
+              {isInCart ? (
+                <Button
+                  href="/cart"
+                  variant="primary"
+                  size="sm"
+                  className="flex-1"
+                  icon={<ShoppingBag className="h-3.5 w-3.5" />}
+                >
+                  Go to Cart
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="flex-1"
+                  disabled={addingToCart}
+                  onClick={handleCart}
+                  icon={<ShoppingBag className="h-3.5 w-3.5" />}
+                >
+                  {cartButtonLabel}
+                </Button>
+              )}
             </div>
           )}
         </div>

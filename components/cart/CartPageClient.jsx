@@ -49,7 +49,7 @@ export function CartPageClient() {
   const [pricingError, setPricingError] = useState("");
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { setCartCount } = useCommerce();
+  const { setCartCount, setCartProductKeys } = useCommerce();
 
   const load = useCallback(() => {
     startTransition(() => {
@@ -60,6 +60,9 @@ export function CartPageClient() {
           setPricing(priceResult?.ok ? priceResult : null);
           setPricingError(priceResult && !priceResult.ok ? priceResult.error : "");
           setCartCount(cartItems.reduce((count, item) => count + (item.quantity || 0), 0));
+          setCartProductKeys(
+            cartItems.flatMap((item) => [item.product_id, item.products?.slug].filter(Boolean)),
+          );
         })
         .catch((error) => {
           console.error("[cart] Could not load cart", error);
@@ -67,7 +70,7 @@ export function CartPageClient() {
         })
         .finally(() => setLoading(false));
     });
-  }, [setCartCount]);
+  }, [setCartCount, setCartProductKeys]);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +83,9 @@ export function CartPageClient() {
           setPricing(priceResult?.ok ? priceResult : null);
           setPricingError(priceResult && !priceResult.ok ? priceResult.error : "");
           setCartCount(cartItems.reduce((count, item) => count + (item.quantity || 0), 0));
+          setCartProductKeys(
+            cartItems.flatMap((item) => [item.product_id, item.products?.slug].filter(Boolean)),
+          );
         })
         .catch((error) => {
           if (cancelled) return;
@@ -91,7 +97,7 @@ export function CartPageClient() {
         });
       });
     return () => { cancelled = true; };
-  }, [setCartCount]);
+  }, [setCartCount, setCartProductKeys]);
 
   const onChanged = () => {
     setLoading(true);

@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, Heart, ShoppingBag } from "lucide-react";
+import Link from "next/link";
 import { useQuote } from "@/components/providers/QuoteProvider";
 import { useCommerce } from "@/components/providers/CommerceProvider";
 import { SHOW_PRICES, CHECKOUT_ENABLED } from "@/config/pricing";
@@ -9,8 +10,9 @@ import { cn } from "@/lib/cn";
 
 export function ProductPurchaseBar({ product }) {
   const { openQuote } = useQuote();
-  const { addToCart, toggleWishlist } = useCommerce();
+  const { addToCart, isProductInCart, toggleWishlist } = useCommerce();
   const router = useRouter();
+  const isInCart = isProductInCart(product.id, product.slug);
 
   const openProductQuote = () =>
     openQuote({
@@ -37,20 +39,32 @@ export function ProductPurchaseBar({ product }) {
             <Heart className="h-5 w-5" strokeWidth={1.75} />
           </button>
 
-          <button
-            type="button"
-            onClick={() => addToCart({ productId: product.id })}
-            className="inline-flex h-12 min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-bh-sage/95 px-4 text-[0.9375rem] font-semibold leading-none text-bh-green shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] bh-focus-ring"
-          >
-            <ShoppingBag className="h-[1.125rem] w-[1.125rem] shrink-0" aria-hidden />
-            <span className="truncate">Add to Cart</span>
-          </button>
+          {isInCart ? (
+            <Link
+              href="/cart"
+              className="inline-flex h-12 min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-bh-sage/95 px-4 text-[0.9375rem] font-semibold leading-none text-bh-green shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] bh-focus-ring"
+            >
+              <ShoppingBag className="h-[1.125rem] w-[1.125rem] shrink-0" aria-hidden />
+              <span className="truncate">Go to Cart</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => addToCart({ productId: product.id, slug: product.slug })}
+              className="inline-flex h-12 min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-bh-sage/95 px-4 text-[0.9375rem] font-semibold leading-none text-bh-green shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] bh-focus-ring"
+            >
+              <ShoppingBag className="h-[1.125rem] w-[1.125rem] shrink-0" aria-hidden />
+              <span className="truncate">Add to Cart</span>
+            </button>
+          )}
 
           {SHOW_PRICES && CHECKOUT_ENABLED ? (
             <button
               type="button"
               onClick={async () => {
-                const result = await addToCart({ productId: product.id });
+                const result = isInCart
+                  ? { ok: true }
+                  : await addToCart({ productId: product.id, slug: product.slug });
                 if (result.ok) router.push("/checkout");
               }}
               className="inline-flex h-12 min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full bg-bh-green px-4 text-[0.9375rem] font-semibold leading-none text-white shadow-[0_8px_22px_rgba(27,61,47,0.22)] bh-focus-ring"

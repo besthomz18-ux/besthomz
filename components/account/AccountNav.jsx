@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 
 const LINKS = [
   { href: "/account", label: "Overview" },
@@ -34,6 +35,10 @@ export function AccountNav() {
         </Link>
         );
       })}
+      <SignOutButton
+        redirectTo="/login"
+        className="h-9 border-red-200/70 bg-white/70 px-3 text-red-700 hover:border-red-300 hover:bg-red-50"
+      />
     </nav>
   );
 }

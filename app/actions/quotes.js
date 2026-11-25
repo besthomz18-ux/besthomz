@@ -9,6 +9,7 @@ import { getCartSessionId } from "@/lib/session/cart-session";
 import { getActiveCartForSession, getActiveCartForUser } from "@/lib/services/cart";
 import { validateQuotePayload } from "@/lib/validation/forms";
 import { getOrCreateQuoteClaimToken } from "@/lib/session/quote-claim";
+import { notifyQuoteRequest } from "@/lib/notifications/order-email";
 
 function parseCartItemsJson(raw) {
   if (!raw) return [];
@@ -136,5 +137,32 @@ export async function submitQuoteRequest(formData) {
     }
   }
 
-  return { ok: true, quoteNumber: quote.quote_number, quoteId: quote.id };
+  let emailWarning;
+  try {
+    await notifyQuoteRequest(quote, items);
+  } catch (emailError) {
+    const emailErrors =
+      emailError instanceof AggregateError ? emailError.errors : [emailError];
+    console.error("[email] Failed to send quote request notification", {
+      quoteId: quote.id,
+      failures: emailErrors.map((failure) => ({
+        code: failure?.code || "UNKNOWN",
+        responseCode: failure?.responseCode,
+        command: failure?.command,
+      })),
+    });
+    const failureCode = emailErrors.find((failure) => failure?.code)?.code;
+    const developmentDetail =
+      process.env.NODE_ENV === "development" && failureCode
+        ? ` (email code: ${failureCode})`
+        : "";
+    emailWarning = `Your quote request was received, but its email notification could not be sent.${developmentDetail}`;
+  }
+
+  return {
+    ok: true,
+    quoteNumber: quote.quote_number,
+    quoteId: quote.id,
+    emailWarning,
+  };
 }

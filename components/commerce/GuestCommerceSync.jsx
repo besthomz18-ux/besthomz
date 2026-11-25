@@ -15,7 +15,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 
 /** Sync guest wishlist slugs + quote claims after login without full page dependency on login form. */
 export function GuestCommerceSync() {
-  const { setWishlistCount } = useCommerce();
+  const { setWishlistCount, markCartProductsAdded } = useCommerce();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -31,6 +31,7 @@ export function GuestCommerceSync() {
       if (!guestItems.length) return;
 
       const cartResult = await mergeLocalGuestCart(guestItems);
+      if (cartResult.mergedSlugs?.length) markCartProductsAdded(cartResult.mergedSlugs);
       for (const slug of cartResult.mergedSlugs || []) removeGuestCartItem(slug);
       if (cartResult.mergedSlugs?.length) router.refresh();
       if (!cartResult.ok) {
@@ -42,7 +43,7 @@ export function GuestCommerceSync() {
     }
 
     sync();
-  }, [router, setWishlistCount, toast]);
+  }, [markCartProductsAdded, router, setWishlistCount, toast]);
 
   return null;
 }

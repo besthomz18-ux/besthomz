@@ -211,12 +211,17 @@ export function CartView({ cart, pricing, onChanged }) {
                         In Stock
                       </span>
                       {SHOW_PRICES && pricingByCartItemId.has(line.id) && (
-                        <p className="mt-2 text-sm text-bh-charcoal">
-                          {formatInrFromPaise(pricingByCartItemId.get(line.id).unit_price_paise)} each
-                          {" · "}
-                          Line total{" "}
-                          {formatInrFromPaise(pricingByCartItemId.get(line.id).line_total_paise)}
-                        </p>
+                        <div className="mt-2 text-sm text-bh-charcoal">
+                          <p>
+                            {formatInrFromPaise(pricingByCartItemId.get(line.id).unit_price_paise)} each
+                            {" · "}
+                            Line total{" "}
+                            {formatInrFromPaise(pricingByCartItemId.get(line.id).line_total_paise)}
+                          </p>
+                          {pricingByCartItemId.get(line.id).price_is_estimate && (
+                            <p className="mt-1 text-xs text-amber-800">Listed price · confirmed with your quote</p>
+                          )}
+                        </div>
                       )}
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-2 md:mt-4">
@@ -379,7 +384,9 @@ export function CartView({ cart, pricing, onChanged }) {
           <p className="mt-2 text-xs leading-relaxed text-bh-muted">
             {SHOW_PRICES
               ? pricing?.ok
-                ? "Total calculated from active product prices. Final shipping or tax may be confirmed before payment."
+                ? pricing.isEstimated
+                  ? "Estimate based on listed catalog prices. Request a quote to confirm final pricing before purchase."
+                  : "Total calculated from active product prices. Final shipping or tax may be confirmed before payment."
                 : "Price details are unavailable for some items. Request a quote or contact our team."
               : "Final price will be shared in your personalised quote — no payment required now."}
           </p>
@@ -397,7 +404,7 @@ export function CartView({ cart, pricing, onChanged }) {
             Request a Quote
             <ArrowRight className="h-4 w-4" aria-hidden />
           </button>
-          {CHECKOUT_ENABLED && (!SHOW_PRICES || pricing?.ok) && (
+          {CHECKOUT_ENABLED && (!SHOW_PRICES || (pricing?.ok && pricing.checkoutEligible)) && (
             <Link
               href="/checkout"
               className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold text-bh-green bh-glass-subtle bh-focus-ring"
@@ -413,9 +420,11 @@ export function CartView({ cart, pricing, onChanged }) {
             Continue Shopping
           </Link>
           <div className="mt-5 rounded-2xl px-4 py-3 text-xs leading-relaxed text-bh-muted bh-glass-subtle">
-            {CHECKOUT_ENABLED
-              ? "Online checkout is available for items with active prices. Payment is processed through Razorpay."
-              : "No payment is required at this stage. Our team will review your cart and share a detailed quote."}
+            {CHECKOUT_ENABLED && pricing?.isEstimated
+              ? "Listed prices are estimates. Online checkout is available after active prices are verified."
+              : CHECKOUT_ENABLED
+                ? "Online checkout is available for items with active prices. Payment is processed through Razorpay."
+                : "No payment is required at this stage. Our team will review your cart and share a detailed quote."}
           </div>
         </aside>
       </div>

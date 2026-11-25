@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useTransition } from "react";
 import { ArrowRight, Heart, ShoppingBag } from "lucide-react";
 import { useQuote } from "@/components/providers/QuoteProvider";
 import { useCommerce } from "@/components/providers/CommerceProvider";
@@ -22,8 +23,10 @@ export function HomeFeaturedMobileCard({
   className,
 }) {
   const { openQuote } = useQuote();
-  const { addToCart, toggleWishlist } = useCommerce();
+  const { addToCart, isProductInCart, toggleWishlist } = useCommerce();
   const slug = href?.replace("/product/", "") || "";
+  const isInCart = isProductInCart(id, slug);
+  const [addingToCart, startAddingToCart] = useTransition();
   const saved = slug && getGuestWishlistSlugs().includes(slug);
   const numericPrice = Number(price);
   const hasPrice = Number.isFinite(numericPrice) && numericPrice > 0;
@@ -101,14 +104,29 @@ export function HomeFeaturedMobileCard({
             Get Quote
             <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
           </button>
-          <button
-            type="button"
-            className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-bh-green px-2 text-[length:var(--bh-text-small)] font-semibold text-white bh-focus-ring"
-            onClick={() => addToCart({ productId: id })}
-          >
-            <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Add to Cart
-          </button>
+          {isInCart ? (
+            <Link
+              href="/cart"
+              className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-bh-green px-2 text-[length:var(--bh-text-small)] font-semibold text-white bh-focus-ring"
+            >
+              <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Go to Cart
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled={addingToCart}
+              className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-bh-green px-2 text-[length:var(--bh-text-small)] font-semibold text-white bh-focus-ring disabled:cursor-not-allowed disabled:opacity-70"
+              onClick={() =>
+                startAddingToCart(async () => {
+                  await addToCart({ productId: id, slug });
+                })
+              }
+            >
+              <ShoppingBag className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              {addingToCart ? "Adding..." : "Add to Cart"}
+            </button>
+          )}
         </div>
       </div>
     </article>

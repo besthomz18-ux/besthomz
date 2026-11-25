@@ -37,6 +37,7 @@ export function QuoteForm({ context = {}, onSuccess }) {
       setSuccess({
         quoteNumber: result.quoteNumber,
         quoteId: result.quoteId,
+        emailWarning: result.emailWarning,
       });
       e.target.reset();
     });
@@ -57,6 +58,11 @@ export function QuoteForm({ context = {}, onSuccess }) {
         <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-bh-muted">
           Our team will contact you shortly to confirm requirements and share a personalised quote.
         </p>
+        {success.emailWarning && (
+          <p className="mx-auto mt-4 max-w-sm rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+            {success.emailWarning}
+          </p>
+        )}
         <div className="mt-6 flex flex-col gap-2.5">
           {success.quoteId && (
             <Button href={`/account/quotes/${success.quoteId}`} variant="outline" className="rounded-full border-0 bh-glass-panel">

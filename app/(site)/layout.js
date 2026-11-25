@@ -6,15 +6,19 @@ import { getAuthUser, getProfileForUser } from "@/lib/auth/server";
 
 async function getCommerceCounts() {
   const cartRes = await fetchCart();
+  const cartItems = cartRes.cart?.cart_items || [];
   const cartCount =
-    cartRes.cart?.cart_items?.reduce((sum, line) => sum + (line.quantity || 0), 0) ?? 0;
+    cartItems.reduce((sum, line) => sum + (line.quantity || 0), 0) ?? 0;
+  const cartProductKeys = cartItems.flatMap((line) =>
+    [line.product_id, line.products?.slug].filter(Boolean),
+  );
   const wlRes = await fetchUserWishlist();
   let wishlistCount = wlRes.wishlist?.wishlist_items?.length ?? 0;
-  return { cartCount, wishlistCount };
+  return { cartCount, cartProductKeys, wishlistCount };
 }
 
 export default async function SiteLayout({ children }) {
-  const [{ cartCount, wishlistCount }, navMenus, authUser] = await Promise.all([
+  const [{ cartCount, cartProductKeys, wishlistCount }, navMenus, authUser] = await Promise.all([
     getCommerceCounts(),
     fetchSiteNavMenus(),
     getAuthUser(),
@@ -31,7 +35,13 @@ export default async function SiteLayout({ children }) {
     : null;
 
   return (
-    <SiteShell cartCount={cartCount} wishlistCount={wishlistCount} navMenus={navMenus} user={user}>
+    <SiteShell
+      cartCount={cartCount}
+      cartProductKeys={cartProductKeys}
+      wishlistCount={wishlistCount}
+      navMenus={navMenus}
+      user={user}
+    >
       {children}
     </SiteShell>
   );

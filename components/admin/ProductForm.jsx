@@ -22,7 +22,7 @@ export function ProductForm({ product, categories, subcategories = [] }) {
 
   return (
     <form
-      className="max-w-3xl space-y-5 rounded-3xl border border-white/75 bg-white/65 p-6 shadow-[0_18px_50px_rgba(27,61,47,0.08)] backdrop-blur-xl md:p-8"
+      className="bh-admin-surface-strong max-w-3xl space-y-5 rounded-3xl p-6 md:p-8"
       onSubmit={(e) => {
         e.preventDefault();
         setError("");

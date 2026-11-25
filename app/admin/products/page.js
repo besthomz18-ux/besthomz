@@ -36,7 +36,7 @@ export default async function AdminProductsPage({ searchParams }) {
         description="Manage product details, catalog visibility, pricing and imagery."
         action={<Link href="/admin/products/new" className="inline-flex h-11 items-center rounded-full bg-bh-green px-5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(27,61,47,0.2)] transition hover:bg-bh-green-light">Add product</Link>}
       />
-      <form className="flex flex-wrap items-center gap-3 rounded-3xl border border-white/75 bg-white/50 p-4 shadow-sm backdrop-blur-xl">
+      <form className="bh-admin-surface flex flex-wrap items-center gap-3 rounded-3xl p-4">
         <select name="status" className="h-10 rounded-full border border-white/80 bg-white/75 px-4 text-sm shadow-sm bh-focus-ring" defaultValue={status || ""}>
           <option value="">All statuses</option>
           <option value="active">Active</option>
