@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Heart, Minus, Plus, ShoppingBag } from "lucide-react";
@@ -27,6 +27,8 @@ export function ProductPurchasePanel({ product, category }) {
     isMattress && /\b\d{2,3}\s*[x×]\s*\d{2,3}\b/i.test(`${product.name} ${product.sku || ""}`);
 
   const [qty, setQty] = useState(1);
+  const [addedToCart, setAddedToCart] = useState(false);
+  const [addingToCart, startAddingToCart] = useTransition();
 
   return (
     <div className="bh-ui flex flex-col xl:h-full">
@@ -78,11 +80,17 @@ export function ProductPurchasePanel({ product, category }) {
         <div className="flex flex-col gap-3 max-lg:gap-3.5 sm:flex-row sm:items-stretch sm:gap-3">
           <button
             type="button"
-            onClick={() => addToCart({ productId: product.id, quantity: qty })}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-bh-sage/95 px-6 font-semibold text-bh-green shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_8px_22px_rgba(27,61,47,0.08)] bh-focus-ring max-lg:h-14 max-lg:text-[0.9375rem] sm:flex-1 lg:h-10 lg:text-[length:var(--bh-text-body)]"
+            disabled={addingToCart}
+            onClick={() =>
+              startAddingToCart(async () => {
+                const result = await addToCart({ productId: product.id, quantity: qty });
+                if (result.ok) setAddedToCart(true);
+              })
+            }
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-bh-sage/95 px-6 font-semibold text-bh-green shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_8px_22px_rgba(27,61,47,0.08)] bh-focus-ring max-lg:h-14 max-lg:text-[0.9375rem] sm:flex-1 lg:h-10 lg:text-[length:var(--bh-text-body)] disabled:opacity-60"
           >
             <ShoppingBag className="h-4 w-4 shrink-0 max-lg:h-[1.125rem] max-lg:w-[1.125rem]" aria-hidden />
-            Add to Cart
+            {addingToCart ? "Adding..." : addedToCart ? "Add More to Cart" : "Add to Cart"}
           </button>
           <button
             type="button"

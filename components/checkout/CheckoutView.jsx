@@ -79,7 +79,9 @@ export function CheckoutView({ preview, userEmail }) {
               vfd.set("razorpay_signature", response.razorpay_signature);
               const verified = await verifyCheckoutPayment(vfd);
               if (verified.ok) {
-                router.push(`/order/success?order=${init.orderId}`);
+                router.push(
+                  `/order/success?order=${init.orderId}${verified.emailWarning ? "&notification=failed" : ""}`,
+                );
               } else {
                 setError(verified.error || "Verification failed.");
                 router.push(`/order/payment-failed?order=${init.orderId}`);

@@ -18,9 +18,25 @@ const ACTIONS = [
 export function OrderAdminActions({ order }) {
   const [pending, startTransition] = useTransition();
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function updateStatus(status) {
+    setMessage("");
+    const result = await adminUpdateOrderStatus(order.id, status);
+    if (!result.ok) {
+      setMessage(result.error || "Could not update order status.");
+      return;
+    }
+    if (result.emailWarning) {
+      setMessage("Order status updated, but the shipping email could not be sent.");
+    }
+  }
 
   return (
     <div className="flex flex-wrap gap-2">
+      {message && (
+        <p className="w-full text-sm text-amber-800" role="status">{message}</p>
+      )}
       {ACTIONS.map((a) => {
         if (!canTransitionOrderStatus(order.status, a.status)) return null;
         if (a.destructive) {
@@ -38,7 +54,7 @@ export function OrderAdminActions({ order }) {
             loading={pending}
             onClick={() =>
               startTransition(async () => {
-                await adminUpdateOrderStatus(order.id, a.status);
+                await updateStatus(a.status);
               })
             }
           >
@@ -54,7 +70,7 @@ export function OrderAdminActions({ order }) {
         destructive
         onConfirm={() =>
           startTransition(async () => {
-            await adminUpdateOrderStatus(order.id, "cancelled");
+            await updateStatus("cancelled");
             setConfirmCancel(false);
           })
         }

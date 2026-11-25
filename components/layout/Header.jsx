@@ -16,7 +16,7 @@ import { desktopNavLinkClass } from "@/components/layout/header-nav-styles";
 import { useQuote } from "@/components/providers/QuoteProvider";
 import { useCommerce } from "@/components/providers/CommerceProvider";
 
-function DesktopHeader({ navMenus }) {
+function DesktopHeader({ navMenus, user }) {
   const { openQuote } = useQuote();
   const { cartCount, wishlistCount } = useCommerce();
   const pathname = usePathname();
@@ -105,20 +105,33 @@ function DesktopHeader({ navMenus }) {
           )}
         </Link>
 
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-1.5 rounded-full px-2 py-2 text-sm font-semibold text-bh-charcoal hover:bg-bh-sage/50 bh-focus-ring xl:px-3"
-          aria-label="Customer sign in"
-        >
-          <UserRound className="h-5 w-5" strokeWidth={1.75} />
-          <span className="hidden xl:inline">Sign in</span>
-        </Link>
-        <Link
-          href="/signup"
-          className="hidden rounded-full border border-bh-green/20 px-3 py-2 text-sm font-semibold text-bh-green hover:bg-bh-sage/50 bh-focus-ring 2xl:inline-flex"
-        >
-          Sign up
-        </Link>
+        {user ? (
+          <Link
+            href="/account"
+            className="inline-flex max-w-40 items-center gap-1.5 rounded-full px-2 py-2 text-sm font-semibold text-bh-charcoal hover:bg-bh-sage/50 bh-focus-ring xl:px-3"
+            aria-label={`My account, ${user.name}`}
+          >
+            <UserRound className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+            <span className="hidden max-w-28 truncate lg:inline">{user.name}</span>
+          </Link>
+        ) : (
+          <>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-2 text-sm font-semibold text-bh-charcoal hover:bg-bh-sage/50 bh-focus-ring xl:px-3"
+              aria-label="Customer sign in"
+            >
+              <UserRound className="h-5 w-5" strokeWidth={1.75} />
+              <span className="hidden xl:inline">Sign in</span>
+            </Link>
+            <Link
+              href="/signup"
+              className="hidden rounded-full border border-bh-green/20 px-3 py-2 text-sm font-semibold text-bh-green hover:bg-bh-sage/50 bh-focus-ring 2xl:inline-flex"
+            >
+              Sign up
+            </Link>
+          </>
+        )}
 
         <button
           type="button"
@@ -133,7 +146,7 @@ function DesktopHeader({ navMenus }) {
   );
 }
 
-export function Header({ navMenus = {} }) {
+export function Header({ navMenus = {}, user = null }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -156,10 +169,10 @@ export function Header({ navMenus = {} }) {
           scrolled && "lg:shadow-[0_2px_12px_rgba(27,61,47,0.06)]",
         )}
       >
-        <MobileHeader scrolled={scrolled} menuOpen={menuOpen} onMenuOpen={() => setMenuOpen(true)} />
-        <DesktopHeader navMenus={navMenus} />
+        <MobileHeader scrolled={scrolled} menuOpen={menuOpen} onMenuOpen={() => setMenuOpen(true)} user={user} />
+        <DesktopHeader navMenus={navMenus} user={user} />
       </div>
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} navMenus={navMenus} />
+      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} navMenus={navMenus} user={user} />
     </header>
   );
 }

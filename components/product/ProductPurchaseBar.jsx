@@ -50,8 +50,8 @@ export function ProductPurchaseBar({ product }) {
             <button
               type="button"
               onClick={async () => {
-                await addToCart({ productId: product.id });
-                router.push("/checkout");
+                const result = await addToCart({ productId: product.id });
+                if (result.ok) router.push("/checkout");
               }}
               className="inline-flex h-12 min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full bg-bh-green px-4 text-[0.9375rem] font-semibold leading-none text-white shadow-[0_8px_22px_rgba(27,61,47,0.22)] bh-focus-ring"
             >

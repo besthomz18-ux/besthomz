@@ -1,5 +1,5 @@
 /** When true, customer UI may show prices and standard buy flows. */
-export const SHOW_PRICES = false;
+export const SHOW_PRICES = process.env.NEXT_PUBLIC_SHOW_PRICES === "true";
 
 /** Checkout UI when true or when SHOW_PRICES is enabled. */
 export const CHECKOUT_ENABLED =

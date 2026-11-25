@@ -22,8 +22,9 @@
 
 ## Pricing flag
 
-- `config/pricing.js` — `SHOW_PRICES` (default `false`).
+- `config/pricing.js` — `SHOW_PRICES` reads `NEXT_PUBLIC_SHOW_PRICES` (default `false`).
 - `CHECKOUT_ENABLED` = `NEXT_PUBLIC_CHECKOUT_ENABLED=true` OR `SHOW_PRICES`.
+- Cart totals are calculated server-side from active `product_pricing` rows; product catalog display prices are not used for checkout.
 - Customer catalog never reads `product_pricing` directly; RLS remains staff-only.
 
 ## Checkout flow
@@ -86,6 +87,6 @@ See Phase 9 spec test checklist (SHOW_PRICES, server totals, verification, webho
 
 - No automatic refunds; admin can record refund status.
 - No PDF invoices (data is invoice-ready via `lib/orders/order-format.js`).
-- Email stubs only unless `EMAIL_PROVIDER` is configured.
+- SMTP email notifications require the `SMTP_*` settings and `ADMIN_NOTIFICATION_EMAIL`; paid order confirmations go to the customer and admin, and shipping updates go to the customer.
 - GST not hard-coded; tax remains 0 until configured.
 - Guest checkout not supported (orders require `user_id`).

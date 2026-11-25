@@ -2,16 +2,21 @@
 
 import { createClientOptional } from "@/lib/supabase/server";
 import { createContactMessage } from "@/lib/services/contact";
+import { notifyContactEnquiry } from "@/lib/notifications/order-email";
+import { FORM_LIMITS, trimField } from "@/lib/validation/forms";
 
 export async function submitContactMessage(formData) {
-  const name = formData.get("name")?.toString().trim();
-  const phone = formData.get("phone")?.toString().trim();
-  const email = formData.get("email")?.toString().trim();
-  const subject = formData.get("subject")?.toString().trim();
-  const message = formData.get("message")?.toString().trim();
+  const name = trimField(formData.get("name"), FORM_LIMITS.name);
+  const phone = trimField(formData.get("phone"), FORM_LIMITS.phone);
+  const email = trimField(formData.get("email"), FORM_LIMITS.email);
+  const subject = trimField(formData.get("subject"), FORM_LIMITS.shortText);
+  const message = trimField(formData.get("message"), FORM_LIMITS.message);
 
   if (!name || !message) {
     return { ok: false, error: "Name and message are required." };
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Please enter a valid email address." };
   }
 
   const supabase = await createClientOptional();
@@ -19,7 +24,7 @@ export async function submitContactMessage(formData) {
     return { ok: false, error: "Unable to send message. Please call us directly." };
   }
 
-  const { error } = await createContactMessage(supabase, {
+  const { data: enquiry, error } = await createContactMessage(supabase, {
     name,
     phone: phone || null,
     email: email || null,
@@ -28,5 +33,18 @@ export async function submitContactMessage(formData) {
   });
 
   if (error) return { ok: false, error: error.message };
-  return { ok: true };
+
+  try {
+    await notifyContactEnquiry(enquiry);
+    return { ok: true };
+  } catch (emailError) {
+    console.error("[email] Failed to send contact enquiry notification", {
+      enquiryId: enquiry.id,
+      error: emailError,
+    });
+    return {
+      ok: true,
+      emailWarning: "Your enquiry was received, but its email notification could not be sent.",
+    };
+  }
 }

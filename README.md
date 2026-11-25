@@ -20,6 +20,25 @@ You can start editing the page by modifying `app/page.js`. The page auto-updates
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment configuration
+
+Copy `.env.example` to `.env.local` and replace the example values. SMTP
+notifications use `EMAIL_PROVIDER=smtp`, the `SMTP_*` settings, and
+`ADMIN_NOTIFICATION_EMAIL`. Paid order confirmations go to the customer and
+admin; contact enquiries go to the admin and receive an acknowledgement when
+the customer supplied an email address. Shipping status updates notify the
+customer.
+
+Set `NEXT_PUBLIC_SHOW_PRICES=true` and `NEXT_PUBLIC_CHECKOUT_ENABLED=true` to
+show the cart price breakdown and enable checkout. Each purchasable product
+needs an active price in `product_pricing`, and Razorpay test credentials are
+required before a payment can be initiated.
+
+Keep `.env.local` private. Only the Supabase URL and anon key are intended for
+the browser. Never expose the service-role key or SMTP password. Supabase Auth
+email delivery is configured separately in your Supabase project's
+Authentication settings.
+
 ## HTC product catalog
 
 The storefront catalog is generated from `data/HTC_BestHomz_Product_Catalog_Details.csv` and images in `public/Products`.

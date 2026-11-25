@@ -28,24 +28,28 @@ export function CommerceProvider({ children, initialCartCount = 0, initialWishli
   );
 
   const addToCart = useCallback(
-    async ({ productId }) => {
+    async ({ productId, quantity = 1 }) => {
+      const requestedQuantity = Math.min(
+        99,
+        Math.max(1, Math.floor(Number(quantity) || 1)),
+      );
       const importedProductSlug =
         typeof productId === "string" && productId.startsWith("import-")
           ? productId.slice("import-".length)
           : "";
       if (/^[a-z0-9][a-z0-9-]*$/.test(importedProductSlug)) {
-        addGuestCartItem(importedProductSlug);
-        toast("Added to cart");
+        addGuestCartItem(importedProductSlug, requestedQuantity);
+        toast(`Added ${requestedQuantity} to cart`);
         return { ok: true, guest: true };
       }
 
-      const result = await addToCartAction({ productId, quantity: 1 });
+      const result = await addToCartAction({ productId, quantity: requestedQuantity });
       if (!result.ok) {
-        toast(result.error || "Could not add to cart");
+        toast(result.error || "Could not add to cart", { variant: "error" });
         return result;
       }
-      setServerCartCount((count) => count + 1);
-      toast("Added to cart");
+      setServerCartCount((count) => count + requestedQuantity);
+      toast(`Added ${requestedQuantity} to cart`);
       return result;
     },
     [toast],

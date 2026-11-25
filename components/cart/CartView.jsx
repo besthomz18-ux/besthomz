@@ -29,13 +29,15 @@ import {
 import { CartRecommendations } from "@/components/cart/CartRecommendations";
 import { CommerceBottomCta } from "@/components/commerce/CommerceBottomCta";
 import { cn } from "@/lib/cn";
+import { SHOW_PRICES } from "@/config/pricing";
+import { formatInrFromPaise } from "@/lib/commerce/money";
 
 function specLineForProduct(product) {
   if (!product) return "";
   return mapProductForCard(product).specLine;
 }
 
-export function CartView({ cart, onChanged }) {
+export function CartView({ cart, pricing, onChanged }) {
   const [pending, startTransition] = useTransition();
   const [coupon, setCoupon] = useState("");
   const [couponNote, setCouponNote] = useState("");
@@ -48,6 +50,9 @@ export function CartView({ cart, onChanged }) {
 
   const totalQty = items.reduce((sum, line) => sum + (line.quantity || 0), 0);
   const itemCount = items.length;
+  const pricingByCartItemId = new Map(
+    (pricing?.lines || []).map((line) => [line.cart_item_id, line]),
+  );
 
   if (!items.length) {
     return (
@@ -83,6 +88,36 @@ export function CartView({ cart, onChanged }) {
 
   const excludeSlugs = items.map((l) => l.products?.slug).filter(Boolean);
 
+  async function changeQuantity(line, quantity) {
+    if (line.is_guest_import) {
+      setGuestCartItemQuantity(line.products?.slug || "", quantity);
+      onChanged?.();
+      return;
+    }
+
+    const result = await setCartItemQuantity(line.id, quantity);
+    if (!result.ok) {
+      toast(result.error || "Could not update quantity", { variant: "error" });
+      return;
+    }
+    onChanged?.();
+  }
+
+  async function removeLine(line, slug) {
+    if (line.is_guest_import) {
+      removeGuestCartItem(slug);
+      onChanged?.();
+      return;
+    }
+
+    const result = await removeFromCart(line.id);
+    if (!result.ok) {
+      toast(result.error || "Could not remove item", { variant: "error" });
+      return;
+    }
+    onChanged?.();
+  }
+
   function toggleSelect(id) {
     setSelectedIds((current) => {
       const next = new Set(current || items.map((line) => line.id));
@@ -110,14 +145,14 @@ export function CartView({ cart, onChanged }) {
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {
-                  clearGuestCart();
-                  try {
-                    const result = await clearCart();
-                    if (!result.ok) toast(result.error || "Could not clear cart");
-                  } finally {
-                    setSelectedIds(new Set());
-                    onChanged?.();
+                  const result = await clearCart();
+                  if (!result.ok) {
+                    toast(result.error || "Could not clear cart", { variant: "error" });
+                    return;
                   }
+                  clearGuestCart();
+                  setSelectedIds(new Set());
+                  onChanged?.();
                 })
               }
               className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-red-600/90 bh-glass-subtle bh-focus-ring disabled:opacity-60"
@@ -175,6 +210,14 @@ export function CartView({ cart, onChanged }) {
                       <span className="mt-2 inline-flex rounded-full bg-bh-sage/70 px-2.5 py-0.5 text-xs font-semibold text-bh-green">
                         In Stock
                       </span>
+                      {SHOW_PRICES && pricingByCartItemId.has(line.id) && (
+                        <p className="mt-2 text-sm text-bh-charcoal">
+                          {formatInrFromPaise(pricingByCartItemId.get(line.id).unit_price_paise)} each
+                          {" · "}
+                          Line total{" "}
+                          {formatInrFromPaise(pricingByCartItemId.get(line.id).line_total_paise)}
+                        </p>
+                      )}
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-2 md:mt-4">
                       <div className="flex flex-wrap items-center gap-3 text-[0.8125rem] font-medium md:gap-4 md:text-sm">
@@ -184,9 +227,7 @@ export function CartView({ cart, onChanged }) {
                           className="inline-flex items-center gap-1.5 text-bh-muted transition hover:text-red-600 bh-focus-ring"
                           onClick={() =>
                             startTransition(async () => {
-                              if (line.is_guest_import) removeGuestCartItem(slug);
-                              else await removeFromCart(line.id);
-                              onChanged?.();
+                              await removeLine(line, slug);
                             })
                           }
                         >
@@ -213,14 +254,12 @@ export function CartView({ cart, onChanged }) {
                       <div className="flex shrink-0 items-center gap-1 rounded-full p-1 bh-glass-subtle">
                         <button
                           type="button"
-                          disabled={pending}
+                          disabled={pending || line.quantity <= 1}
                           className="flex h-8 w-8 items-center justify-center rounded-full text-bh-charcoal bh-focus-ring disabled:opacity-50"
                           aria-label="Decrease quantity"
                           onClick={() =>
                             startTransition(async () => {
-                              if (line.is_guest_import) setGuestCartItemQuantity(slug, line.quantity - 1);
-                              else await setCartItemQuantity(line.id, line.quantity - 1);
-                              onChanged?.();
+                              await changeQuantity(line, line.quantity - 1);
                             })
                           }
                         >
@@ -231,14 +270,12 @@ export function CartView({ cart, onChanged }) {
                         </span>
                         <button
                           type="button"
-                          disabled={pending}
+                          disabled={pending || line.quantity >= 99}
                           className="flex h-8 w-8 items-center justify-center rounded-full text-bh-charcoal bh-focus-ring disabled:opacity-50"
                           aria-label="Increase quantity"
                           onClick={() =>
                             startTransition(async () => {
-                              if (line.is_guest_import) setGuestCartItemQuantity(slug, line.quantity + 1);
-                              else await setCartItemQuantity(line.id, line.quantity + 1);
-                              onChanged?.();
+                              await changeQuantity(line, line.quantity + 1);
                             })
                           }
                         >
@@ -302,21 +339,49 @@ export function CartView({ cart, onChanged }) {
               </dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-bh-muted">Delivery Charges</dt>
-              <dd className="font-semibold text-bh-green">Free</dd>
+              <dt className="text-bh-muted">{SHOW_PRICES ? "Subtotal" : "Delivery Charges"}</dt>
+              <dd className="font-semibold text-bh-green">
+                {SHOW_PRICES && pricing?.ok
+                  ? formatInrFromPaise(pricing.subtotalPaise)
+                  : SHOW_PRICES ? "—" : "Free"}
+              </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-bh-muted">Discount</dt>
-              <dd className="text-bh-muted">—</dd>
+              <dd className="text-bh-muted">
+                {SHOW_PRICES && pricing?.ok
+                  ? formatInrFromPaise(pricing.discountPaise)
+                  : "—"}
+              </dd>
             </div>
+            {SHOW_PRICES && pricing?.ok && (
+              <>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-bh-muted">Delivery Charges</dt>
+                  <dd className="text-bh-charcoal">{formatInrFromPaise(pricing.shippingPaise)}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-bh-muted">Tax</dt>
+                  <dd className="text-bh-charcoal">{formatInrFromPaise(pricing.taxPaise)}</dd>
+                </div>
+              </>
+            )}
           </dl>
           <div className="my-5 h-px bg-gradient-to-r from-transparent via-bh-sage/50 to-transparent" />
           <div className="flex justify-between gap-4 text-sm">
             <span className="font-medium text-bh-charcoal">Estimated Total</span>
-            <span className="font-sans text-[length:var(--bh-text-h3)] font-semibold text-bh-charcoal">Quote</span>
+            <span className="font-sans text-[length:var(--bh-text-h3)] font-semibold text-bh-charcoal">
+              {SHOW_PRICES && pricing?.ok
+                ? formatInrFromPaise(pricing.totalPaise)
+                : SHOW_PRICES ? "Unavailable" : "Quote"}
+            </span>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-bh-muted">
-            Final price will be shared in your personalised quote — no payment required now.
+            {SHOW_PRICES
+              ? pricing?.ok
+                ? "Total calculated from active product prices. Final shipping or tax may be confirmed before payment."
+                : "Price details are unavailable for some items. Request a quote or contact our team."
+              : "Final price will be shared in your personalised quote — no payment required now."}
           </p>
           <button
             type="button"
@@ -332,7 +397,7 @@ export function CartView({ cart, onChanged }) {
             Request a Quote
             <ArrowRight className="h-4 w-4" aria-hidden />
           </button>
-          {CHECKOUT_ENABLED && (
+          {CHECKOUT_ENABLED && (!SHOW_PRICES || pricing?.ok) && (
             <Link
               href="/checkout"
               className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold text-bh-green bh-glass-subtle bh-focus-ring"
@@ -348,7 +413,9 @@ export function CartView({ cart, onChanged }) {
             Continue Shopping
           </Link>
           <div className="mt-5 rounded-2xl px-4 py-3 text-xs leading-relaxed text-bh-muted bh-glass-subtle">
-            No payment is required at this stage. Our team will review your cart and share a detailed quote.
+            {CHECKOUT_ENABLED
+              ? "Online checkout is available for items with active prices. Payment is processed through Razorpay."
+              : "No payment is required at this stage. Our team will review your cart and share a detailed quote."}
           </div>
         </aside>
       </div>

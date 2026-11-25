@@ -6,7 +6,7 @@ import { Logo } from "@/components/brand/Logo";
 import { useCommerce } from "@/components/providers/CommerceProvider";
 import { cn } from "@/lib/cn";
 
-export function MobileHeader({ scrolled, onMenuOpen, menuOpen = false }) {
+export function MobileHeader({ scrolled, onMenuOpen, menuOpen = false, user = null }) {
   const { cartCount, wishlistCount } = useCommerce();
   return (
     <div
@@ -49,9 +49,9 @@ export function MobileHeader({ scrolled, onMenuOpen, menuOpen = false }) {
           )}
         </Link>
         <Link
-          href="/login"
+          href={user ? "/account" : "/login"}
           className="rounded-full p-2.5 text-bh-charcoal hover:bg-bh-sage/60 bh-focus-ring"
-          aria-label="Customer sign in"
+          aria-label={user ? `My account, ${user.name}` : "Customer sign in"}
         >
           <UserRound className="h-5 w-5" strokeWidth={1.75} />
         </Link>

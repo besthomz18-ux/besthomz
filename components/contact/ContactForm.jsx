@@ -11,13 +11,13 @@ const fieldClass =
 
 export function ContactForm({ className }) {
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [notice, setNotice] = useState(null);
   const [pending, startTransition] = useTransition();
 
   function onSubmit(e) {
     e.preventDefault();
     setError("");
-    setSuccess(false);
+    setNotice(null);
     const formData = new FormData(e.currentTarget);
     startTransition(async () => {
       const result = await submitContactMessage(formData);
@@ -25,7 +25,10 @@ export function ContactForm({ className }) {
         setError(result.error);
         return;
       }
-      setSuccess(true);
+      setNotice({
+        message: result.emailWarning || "Thank you — we will get back to you soon.",
+        warning: Boolean(result.emailWarning),
+      });
       e.target.reset();
     });
   }
@@ -71,9 +74,12 @@ export function ContactForm({ className }) {
       {error && (
         <p className="text-sm text-red-600" role="alert">{error}</p>
       )}
-      {success && (
-        <p className="text-sm font-medium text-bh-green" role="status">
-          Thank you — we will get back to you soon.
+      {notice && (
+        <p
+          className={`text-sm font-medium ${notice.warning ? "text-amber-800" : "text-bh-green"}`}
+          role="status"
+        >
+          {notice.message}
         </p>
       )}
       <button

@@ -9,7 +9,11 @@ export async function adminUpdateOrderStatus(orderId, status, { cancelReason } =
   const { supabase } = await getStaffSupabase();
   if (!supabase) return { ok: false, error: "Unauthorized" };
 
-  const { data: order } = await supabase.from("orders").select("id, status").eq("id", orderId).maybeSingle();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, status, order_number, billing_address, total, currency")
+    .eq("id", orderId)
+    .maybeSingle();
   if (!order) return { ok: false, error: "Order not found." };
   if (!canTransitionOrderStatus(order.status, status)) {
     return { ok: false, error: `Cannot change status from ${order.status} to ${status}.` };
@@ -18,14 +22,19 @@ export async function adminUpdateOrderStatus(orderId, status, { cancelReason } =
   const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
   if (error) return { ok: false, error: error.message };
 
+  let emailWarning = false;
   if (status === "shipped") {
-    const { data: full } = await supabase.from("orders").select("order_number").eq("id", orderId).maybeSingle();
-    await notifyOrderShipped(full);
+    try {
+      await notifyOrderShipped(order);
+    } catch (emailError) {
+      console.error("[email] Failed to send shipping notification", { orderId, error: emailError });
+      emailWarning = true;
+    }
   }
 
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
-  return { ok: true };
+  return { ok: true, emailWarning };
 }
 
 export async function adminRecordPaymentRefund(paymentId) {

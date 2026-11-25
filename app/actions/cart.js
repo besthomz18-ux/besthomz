@@ -78,6 +78,10 @@ export async function addToCart({ productId, variantId = null, quantity = 1 }) {
   if (!isUuid(productId)) {
     return { ok: false, error: "Sign in or import catalog to save this item." };
   }
+  const requestedQuantity = Number(quantity);
+  if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1 || requestedQuantity > 99) {
+    return { ok: false, error: "Quantity must be between 1 and 99." };
+  }
 
   const user = await getAuthUser();
   const supabase = await getUserClient();
@@ -107,6 +111,9 @@ export async function addToCart({ productId, variantId = null, quantity = 1 }) {
 }
 
 export async function setCartItemQuantity(itemId, quantity) {
+  if (!isUuid(itemId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+    return { ok: false, error: "Quantity must be between 1 and 99." };
+  }
   const user = await getAuthUser();
   const supabase = await getUserClient();
   const client = user && supabase ? supabase : await getGuestAdmin();
@@ -116,6 +123,59 @@ export async function setCartItemQuantity(itemId, quantity) {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/cart");
   return { ok: true };
+}
+
+export async function mergeLocalGuestCart(items) {
+  const user = await getAuthUser();
+  const supabase = await getUserClient();
+  if (!user || !supabase) return { ok: false, mergedSlugs: [] };
+
+  const requestedItems = (Array.isArray(items) ? items : [])
+    .filter((item) =>
+      typeof item?.slug === "string" &&
+      /^[a-z0-9][a-z0-9-]*$/.test(item.slug) &&
+      Number.isInteger(item.quantity) &&
+      item.quantity > 0,
+    )
+    .slice(0, 100)
+    .map((item) => ({ slug: item.slug, quantity: Math.min(item.quantity, 99) }));
+  const slugs = [...new Set(requestedItems.map((item) => item.slug))];
+  if (!slugs.length) return { ok: true, mergedSlugs: [] };
+
+  const { data: products, error: productsError } = await supabase
+    .from("products")
+    .select("id, slug")
+    .in("slug", slugs)
+    .eq("status", "active");
+  if (productsError) {
+    return { ok: false, error: productsError.message, mergedSlugs: [] };
+  }
+
+  const productBySlug = new Map((products || []).map((product) => [product.slug, product]));
+  const cartId = await ensureUserCart(supabase, user.id);
+  if (!cartId) return { ok: false, error: "Could not create cart.", mergedSlugs: [] };
+
+  const mergedSlugs = [];
+  for (const item of requestedItems) {
+    const product = productBySlug.get(item.slug);
+    if (!product || mergedSlugs.includes(item.slug)) continue;
+
+    const { error } = await upsertCartLine(supabase, cartId, {
+      productId: product.id,
+      quantity: item.quantity,
+    });
+    if (error) {
+      return { ok: false, error: error.message, mergedSlugs };
+    }
+    mergedSlugs.push(item.slug);
+  }
+
+  revalidatePath("/cart");
+  return {
+    ok: true,
+    mergedSlugs,
+    unavailableSlugs: slugs.filter((slug) => !productBySlug.has(slug)),
+  };
 }
 
 export async function removeFromCart(itemId) {

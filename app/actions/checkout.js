@@ -8,11 +8,11 @@ import { fetchCart } from "@/app/actions/cart";
 import { calculateCartPricing } from "@/lib/commerce/pricing";
 import { orderLineFromPricingLine } from "@/lib/services/orders";
 import { createRazorpayOrder, verifyPaymentSignature, isRazorpayConfigured, getPublicKeyId } from "@/lib/payments/razorpay";
-import { CHECKOUT_ENABLED, isPaymentsConfigured } from "@/config/pricing";
+import { CHECKOUT_ENABLED, isPaymentsConfigured, SHOW_PRICES } from "@/config/pricing";
 import { trimField, FORM_LIMITS } from "@/lib/validation/forms";
 import { markCartConverted } from "@/lib/services/cart";
 import { paiseToRupees } from "@/lib/commerce/money";
-import { notifyOrderConfirmed, notifyPaymentConfirmed } from "@/lib/notifications/order-email";
+import { notifyOrderConfirmed } from "@/lib/notifications/order-email";
 
 function parseAddress(formData, prefix) {
   return {
@@ -22,6 +22,71 @@ function parseAddress(formData, prefix) {
     state: trimField(formData.get(`${prefix}_state`), 100),
     pincode: trimField(formData.get(`${prefix}_pincode`), 12),
   };
+}
+
+export async function getCartPriceSummary(localItems = []) {
+  if (!SHOW_PRICES) {
+    return { ok: false, error: "Public pricing is not enabled." };
+  }
+
+  const cartRes = await fetchCart();
+  const cartItems = [...(cartRes.cart?.cart_items || [])];
+  const localItemsBySlug = new Map();
+  for (const item of Array.isArray(localItems) ? localItems.slice(0, 100) : []) {
+    if (
+      typeof item?.slug !== "string" ||
+      !/^[a-z0-9][a-z0-9-]*$/.test(item.slug) ||
+      !Number.isInteger(item.quantity) ||
+      item.quantity < 1
+    ) {
+      continue;
+    }
+    const quantity = Math.min(99, (localItemsBySlug.get(item.slug) || 0) + item.quantity);
+    localItemsBySlug.set(item.slug, quantity);
+  }
+  if (!cartItems.length && !localItemsBySlug.size) {
+    return { ok: false, error: "" };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { ok: false, error: "Price details are temporarily unavailable." };
+  }
+
+  if (localItemsBySlug.size) {
+    const { data: products, error } = await admin
+      .from("products")
+      .select("id, slug, name, sku, status")
+      .in("slug", [...localItemsBySlug.keys()])
+      .eq("status", "active");
+    if (error) {
+      return { ok: false, error: "Could not load online prices for your cart." };
+    }
+
+    const productsBySlug = new Map((products || []).map((product) => [product.slug, product]));
+    const unavailableSlug = [...localItemsBySlug.keys()].find((slug) => !productsBySlug.has(slug));
+    if (unavailableSlug) {
+      return {
+        ok: false,
+        error: "Some cart items are not available for online checkout. Please request a quote.",
+      };
+    }
+
+    for (const [slug, quantity] of localItemsBySlug) {
+      const product = productsBySlug.get(slug);
+      cartItems.push({
+        id: `guest-${slug}`,
+        product_id: product.id,
+        variant_id: null,
+        quantity,
+        products: product,
+      });
+    }
+  }
+
+  return calculateCartPricing(admin, cartItems);
 }
 
 export async function getCheckoutPreview() {
@@ -194,7 +259,7 @@ export async function verifyCheckoutPayment(formData) {
 
   const { data: order } = await admin
     .from("orders")
-    .select("id, order_number, user_id, status, payment_status")
+    .select("id, order_number, user_id, status, payment_status, total, currency, billing_address")
     .eq("id", orderId)
     .maybeSingle();
   if (!order || order.user_id !== user.id) {
@@ -214,7 +279,7 @@ export async function verifyCheckoutPayment(formData) {
     return { ok: true, orderNumber: order.order_number, alreadyPaid: true };
   }
 
-  const { error: payUpdErr } = await admin
+  const { data: paidPayment, error: payUpdErr } = await admin
     .from("payments")
     .update({
       status: "paid",
@@ -223,9 +288,14 @@ export async function verifyCheckoutPayment(formData) {
       paid_at: new Date().toISOString(),
     })
     .eq("id", payment.id)
-    .neq("status", "paid");
+    .neq("status", "paid")
+    .select("id")
+    .maybeSingle();
 
   if (payUpdErr) return { ok: false, error: "Could not update payment." };
+  if (!paidPayment) {
+    return { ok: true, orderNumber: order.order_number, alreadyPaid: true };
+  }
 
   await admin
     .from("orders")
@@ -240,13 +310,20 @@ export async function verifyCheckoutPayment(formData) {
     await markCartConverted(admin, payment.metadata.cart_id);
   }
 
-  const { data: confirmed } = await admin.from("orders").select("order_number").eq("id", orderId).maybeSingle();
-  await notifyOrderConfirmed(confirmed);
-  await notifyPaymentConfirmed(confirmed, payment);
+  let emailWarning = false;
+  try {
+    await notifyOrderConfirmed({
+      ...order,
+      customer_email: order.billing_address?.email || user.email,
+    });
+  } catch (error) {
+    console.error("[email] Failed to send order confirmation", { orderId, error });
+    emailWarning = true;
+  }
 
   revalidatePath("/cart");
   revalidatePath("/account/orders");
-  return { ok: true, orderId: order.id };
+  return { ok: true, orderId: order.id, emailWarning };
 }
 
 export async function markPaymentFailed(formData) {

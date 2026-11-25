@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchCart, fetchImportedCartProducts } from "@/app/actions/cart";
+import { getCartPriceSummary } from "@/app/actions/checkout";
 import { CartView } from "@/components/cart/CartView";
 import { useCommerce } from "@/components/providers/CommerceProvider";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
 import { getGuestCartItems } from "@/lib/commerce/client-storage";
+import { SHOW_PRICES } from "@/config/pricing";
 
 async function fetchCombinedCart() {
   const res = await fetchCart();
@@ -31,41 +33,68 @@ async function fetchCombinedCart() {
   });
   return {
     cart: { ...(res.cart || {}), cart_items: [...(res.cart?.cart_items || []), ...guestCartItems] },
+    guestItems,
   };
+}
+
+async function fetchCartPageData() {
+  const res = await fetchCombinedCart();
+  const priceResult = SHOW_PRICES ? await getCartPriceSummary(res.guestItems) : null;
+  return { res, priceResult };
 }
 
 export function CartPageClient() {
   const [cart, setCart] = useState(null);
+  const [pricing, setPricing] = useState(null);
+  const [pricingError, setPricingError] = useState("");
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { setCartCount } = useCommerce();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const res = await fetchCombinedCart();
-    const cartItems = res.cart.cart_items;
-    setCart(res.cart);
-    setCartCount(cartItems.reduce((count, item) => count + (item.quantity || 0), 0));
-    setLoading(false);
+  const load = useCallback(() => {
+    startTransition(() => {
+      fetchCartPageData()
+        .then(({ res, priceResult }) => {
+          const cartItems = res.cart.cart_items;
+          setCart(res.cart);
+          setPricing(priceResult?.ok ? priceResult : null);
+          setPricingError(priceResult && !priceResult.ok ? priceResult.error : "");
+          setCartCount(cartItems.reduce((count, item) => count + (item.quantity || 0), 0));
+        })
+        .catch((error) => {
+          console.error("[cart] Could not load cart", error);
+          setPricingError("Could not load cart details. Please refresh and try again.");
+        })
+        .finally(() => setLoading(false));
+    });
   }, [setCartCount]);
 
   useEffect(() => {
-    let active = true;
-    const run = async () => {
-      const res = await fetchCombinedCart();
-      if (!active) return;
-      const cartItems = res.cart.cart_items;
-      setCart(res.cart);
-      setCartCount(cartItems.reduce((count, item) => count + (item.quantity || 0), 0));
-      setLoading(false);
-    };
-    run();
-    return () => {
-      active = false;
-    };
+    let cancelled = false;
+    startTransition(() => {
+      fetchCartPageData()
+        .then(({ res, priceResult }) => {
+          if (cancelled) return;
+          const cartItems = res.cart.cart_items;
+          setCart(res.cart);
+          setPricing(priceResult?.ok ? priceResult : null);
+          setPricingError(priceResult && !priceResult.ok ? priceResult.error : "");
+          setCartCount(cartItems.reduce((count, item) => count + (item.quantity || 0), 0));
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          console.error("[cart] Could not load cart", error);
+          setPricingError("Could not load cart details. Please refresh and try again.");
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      });
+    return () => { cancelled = true; };
   }, [setCartCount]);
 
   const onChanged = () => {
+    setLoading(true);
     load();
     router.refresh();
   };
@@ -77,5 +106,14 @@ export function CartPageClient() {
       </PageContainer>
     );
   }
-  return <CartView cart={cart} onChanged={onChanged} />;
+  return (
+    <>
+      {pricingError && (
+        <PageContainer>
+          <p className="mb-4 text-sm text-amber-800" role="status">{pricingError}</p>
+        </PageContainer>
+      )}
+      <CartView cart={cart} pricing={pricing} onChanged={onChanged} />
+    </>
+  );
 }

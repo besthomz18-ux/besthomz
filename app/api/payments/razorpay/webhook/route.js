@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSignature } from "@/lib/payments/razorpay";
 import { markCartConverted } from "@/lib/services/cart";
+import { notifyOrderConfirmed } from "@/lib/notifications/order-email";
 
 export const dynamic = "force-dynamic";
 
@@ -15,19 +16,33 @@ async function markOrderPaid(admin, { providerOrderId, providerPaymentId }) {
   if (!payment) return { ok: false, reason: "payment_not_found" };
   if (payment.status === "paid") return { ok: true, idempotent: true };
 
-  const { data: order } = await admin.from("orders").select("id, payment_status").eq("id", payment.order_id).maybeSingle();
+  const { data: order } = await admin
+    .from("orders")
+    .select("id, order_number, user_id, payment_status, total, currency, billing_address")
+    .eq("id", payment.order_id)
+    .maybeSingle();
   if (!order) return { ok: false, reason: "order_not_found" };
 
-  await admin
+  const { data: updatedPayment, error: paymentUpdateError } = await admin
     .from("payments")
     .update({
       status: "paid",
       provider_payment_id: providerPaymentId,
       paid_at: new Date().toISOString(),
     })
-    .eq("id", payment.id);
+    .eq("id", payment.id)
+    .neq("status", "paid")
+    .select("id")
+    .maybeSingle();
 
-  await admin.from("orders").update({ status: "confirmed", payment_status: "paid" }).eq("id", order.id);
+  if (paymentUpdateError) throw paymentUpdateError;
+  if (!updatedPayment) return { ok: true, idempotent: true };
+
+  const { error: orderUpdateError } = await admin
+    .from("orders")
+    .update({ status: "confirmed", payment_status: "paid" })
+    .eq("id", order.id);
+  if (orderUpdateError) throw orderUpdateError;
 
   const cartItemIds = payment.metadata?.cart_item_ids;
   if (Array.isArray(cartItemIds) && cartItemIds.length) {
@@ -37,7 +52,25 @@ async function markOrderPaid(admin, { providerOrderId, providerPaymentId }) {
     await markCartConverted(admin, payment.metadata.cart_id);
   }
 
-  return { ok: true };
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("id", order.user_id)
+    .maybeSingle();
+
+  try {
+    await notifyOrderConfirmed({
+      ...order,
+      customer_email: order.billing_address?.email || profile?.email,
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error("[email] Failed to send webhook order confirmation", {
+      orderId: order.id,
+      error,
+    });
+    return { ok: true, emailWarning: true };
+  }
 }
 
 export async function POST(request) {
@@ -63,10 +96,14 @@ export async function POST(request) {
 
     if (eventType === "payment.captured") {
       const p = payload?.payment?.entity;
-      await markOrderPaid(admin, {
+      const result = await markOrderPaid(admin, {
         providerOrderId: p?.order_id,
         providerPaymentId: p?.id,
       });
+      if (!result.ok && result.reason !== "payment_not_found") {
+        console.error("razorpay webhook could not mark order paid", result.reason);
+        return new Response("Could not confirm payment", { status: 500 });
+      }
     }
 
     if (eventType === "payment.failed") {

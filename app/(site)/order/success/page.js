@@ -17,6 +17,7 @@ export const metadata = {
 export default async function OrderSuccessPage({ searchParams }) {
   const params = await searchParams;
   const orderId = params?.order;
+  const emailWarning = params?.notification === "failed";
   if (!orderId) notFound();
 
   const user = await requireAuth("/order/success");
@@ -30,6 +31,11 @@ export default async function OrderSuccessPage({ searchParams }) {
       <CheckCircle2 className="mx-auto h-16 w-16 text-bh-green" aria-hidden />
       <h1 className="mt-6 font-display text-3xl font-semibold">Your order has been confirmed</h1>
       <p className="mt-2 text-bh-muted">Order {order.order_number}</p>
+      {emailWarning && (
+        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-left text-sm text-amber-900" role="status">
+          Your order is confirmed, but we could not send the email confirmation. Please save your order number.
+        </p>
+      )}
       <GlassCard className="mt-8 p-6 text-left">
         <p className="text-sm">Payment status: <span className="font-medium capitalize">{order.payment_status}</span></p>
         {order.total != null && <p className="mt-2 text-sm">Total: {formatInrFromRupees(order.total)}</p>}

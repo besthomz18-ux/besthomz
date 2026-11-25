@@ -58,9 +58,24 @@ export async function submitQuoteRequest(formData) {
     return { ok: false, error: "Unable to connect. Please call us directly." };
   }
 
-  const { data: quote, error } = await createQuoteRequest(supabase, payload);
+  let quoteSupabase;
+  try {
+    quoteSupabase = createAdminClient();
+  } catch (error) {
+    console.error("[quote] Quote service is not configured", error);
+    return { ok: false, error: "Quote requests are temporarily unavailable. Please try again later." };
+  }
+
+  const { data: quote, error } = await createQuoteRequest(quoteSupabase, payload);
   if (error) {
-    return { ok: false, error: "We could not submit your request. Please try again or call us." };
+    console.error("[quote] Could not create quote request", { code: error.code });
+    const supportCode = /^[A-Z0-9]{3,12}$/.test(error.code || "") ? error.code : "UNKNOWN";
+    const developmentDetail =
+      process.env.NODE_ENV === "development" ? ` (database code: ${supportCode})` : "";
+    return {
+      ok: false,
+      error: `We could not submit your request. Please try again or call us.${developmentDetail}`,
+    };
   }
 
   const items = [];
@@ -89,7 +104,17 @@ export async function submitQuoteRequest(formData) {
   }
 
   if (items.length && quote?.id) {
-    await addQuoteItems(supabase, quote.id, items);
+    const { error: itemsError } = await addQuoteItems(quoteSupabase, quote.id, items);
+    if (itemsError) {
+      console.error("[quote] Could not add quote items", {
+        code: itemsError.code,
+        quoteId: quote.id,
+      });
+      return {
+        ok: false,
+        error: `Your request was created (${quote.quote_number}), but we could not attach the cart items. Please contact us with this reference.`,
+      };
+    }
   }
 
   const fromCart = formData.get("from_cart")?.toString() === "1";
